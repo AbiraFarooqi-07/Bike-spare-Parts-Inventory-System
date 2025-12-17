@@ -1,5 +1,5 @@
 # Bike-spare-Parts-Inventory-System
-#   Auto Bike Spare Parts – Inventory & Billing System
+#  Auto Bike Spare Parts – Inventory & Billing System
 
 A complete **Inventory & Billing Management System** built using **HTML, CSS, and JavaScript**.  
 This project is designed for small bike spare parts shops and works **offline** using browser **localStorage**.
@@ -59,14 +59,14 @@ Auto-bike-inventory/
 
 ---
 
-## ▶️ How to Run
+## How to Run
 1. Download or clone the repository
 2. Open `index.html` in any modern web browser
 3. Start managing inventory and billing
 
 ---
 
-## ⚠️ Important Notes
+##  Important Notes
 - No backend or database is used
 - All data is stored locally in the browser
 - Clearing browser data will erase saved records
