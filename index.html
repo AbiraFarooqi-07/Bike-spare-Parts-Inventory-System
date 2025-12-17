@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title> Auto Bike Spare Parts - Inventory & Billing</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!--
+     Auto Bike Spare Parts
+    Inventory & Billing Management Template
+    - Pure HTML/CSS/JS (no frameworks)
+    - Works offline using localStorage
+    - Clean, professional, responsive UI
+    - Well-commented and easy to modify
+
+    Features:
+    - Dashboard: total stock, low-stock alerts, total sales, total items
+    - Inventory: add/edit/delete items; search & filters; color coding
+    - Billing: multi-item bills, price modes, auto totals, discount/tax, printable receipts
+    - Stock auto-update on sale, low stock warnings
+    - Data: inventory, bills, transactions all in localStorage
+    - Bonus: daily/monthly sales records, export CSV, PDF-ready print, reset all data
+  -->
+  <style>
+    :root{
+      --bg:#0f172a;              /* Slate-900 */
+      --panel:#0b1224;           /* Slight lighter for panel */
+      --muted:#94a3b8;           /* Slate-400 */
+      --text:#e2e8f0;            /* Slate-200 */
+      --accent:#38bdf8;          /* Sky-400 */
+      --accent-2:#22c55e;        /* Green-500 */
+      --warn:#f59e0b;            /* Amber-500 */
+      --danger:#ef4444;          /* Red-500 */
+      --border:#1e293b;          /* Slate-800 */
+      --wholesale:#1d4ed8;       /* Blue-600 */
+      --retail:#16a34a;          /* Green-600 */
+      --shadow:0 6px 30px rgba(0,0,0,.35);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      background:linear-gradient(180deg, var(--bg), #0b132b);
+      color:var(--text);
+      font:14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
+    }
+
+    /* Layout */
+    header{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:16px 20px; border-bottom:1px solid var(--border); background:rgba(11,18,36,.6); backdrop-filter: blur(8px);
+      position:sticky; top:0; z-index:50;
+    }
+    header .brand{
+      display:flex; gap:14px; align-items:center;
+    }
+    .logo{
+      width:38px; height:38px; border-radius:10px; background:linear-gradient(135deg, var(--accent), #7dd3fc);
+      box-shadow: var(--shadow);
+    }
+    .brand .title{
+      font-weight:700; letter-spacing:.3px;
+    }
+    .brand .subtitle{
+      font-size:12px; color:var(--muted);
+    }
+    nav{
+      display:flex; gap:10px; flex-wrap:wrap;
+    }
+    .tab{
+      padding:8px 12px; border:1px solid var(--border); border-radius:10px; background:#0a1429; color:var(--text);
+      cursor:pointer; transition:.2s; box-shadow:0 2px 10px rgba(0,0,0,.2) inset;
+    }
+    .tab.active{border-color:var(--accent); color:#e9f8ff; background:linear-gradient(180deg,#071022,#0d1a36)}
+    .container{
+      max-width:1200px; margin:20px auto; padding:0 16px;
+    }
+
+    /* Cards & panels */
+    .grid-4{
+      display:grid; grid-template-columns:repeat(4,1fr); gap:16px;
+    }
+    @media (max-width:1000px){ .grid-4{grid-template-columns:repeat(2,1fr)} }
+    @media (max-width:600px){ .grid-4{grid-template-columns:1fr} }
+    .card{
+      background:linear-gradient(180deg,#0a1429,#0b1326);
+      border:1px solid var(--border);
+      border-radius:14px; padding:16px; box-shadow: var(--shadow);
+    }
+    .card h3{margin:0 0 8px 0; font-size:16px; color:#cfe9ff}
+    .metric{
+      font-size:28px; font-weight:700; margin:8px 0;
+    }
+    .metric.small{font-size:18px; font-weight:600}
+    .muted{color:var(--muted)}
+    .highlight{color:var(--accent-2)}
+    .danger{color:var(--danger)}
+    .warn{color:var(--warn)}
+
+    /* Forms & inputs */
+    .toolbar{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px}
+    input[type="text"],input[type="number"],select,textarea{
+      background:#0a1429; border:1px solid var(--border); color:var(--text);
+      padding:8px 10px; border-radius:10px; outline:none; min-height:36px;
+    }
+    input::placeholder{color:#64748b}
+    .btn{
+      padding:8px 12px; border-radius:10px; border:1px solid var(--border);
+      background:#0a1429; color:#eaf6ff; cursor:pointer; transition:.2s;
+    }
+    .btn:hover{border-color:var(--accent); color:#d8f3ff}
+    .btn.primary{ background:linear-gradient(180deg,#09314b,#0a3d5f); border-color:#0b4268 }
+    .btn.success{ background:linear-gradient(180deg,#0c3a2a,#0e4a37); border-color:#0f5c44 }
+    .btn.warn{ background:linear-gradient(180deg,#4a370a,#5c440f); border-color:#6b540f }
+    .btn.danger{ background:linear-gradient(180deg,#4a0c0c,#5c0f0f); border-color:#6b0f0f }
+    .btn.secondary{ background:linear-gradient(180deg,#0a1429,#0b1630) }
+
+    /* Table */
+    table{
+      width:100%; border-collapse: collapse; overflow:hidden; border-radius:12px;
+    }
+    thead th{
+      text-align:left; padding:10px; background:#0c1733; color:#cfe9ff; border-bottom:1px solid var(--border);
+      position:sticky; top:0; z-index:1;
+    }
+    tbody td{
+      padding:10px; border-bottom:1px solid var(--border); background:#0a1429;
+    }
+    tbody tr:hover td{background:#0b162f}
+    .tag{
+      display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid var(--border);
+    }
+    .tag.wholesale{ background:#0b1f3d; color:#cde1ff; border-color:#223a6a }
+    .tag.retail{ background:#0b2d1a; color:#d8ffe4; border-color:#1d4c33 }
+    .tag.low{ background:#3a2605; color:#ffe8bb; border-color:#5e420d }
+    .tag.alert{ background:#3a0f10; color:#ffd8d8; border-color:#5e191a }
+
+    /* Modal */
+    .modal-backdrop{
+      position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:100;
+    }
+    .modal{
+      width:clamp(300px, 92vw, 720px);
+      background:linear-gradient(180deg,#0a1429,#0b1326);
+      border:1px solid var(--border); border-radius:16px; box-shadow: var(--shadow);
+      padding:16px;
+    }
+    .modal-header{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px}
+    .modal-header h3{margin:0; font-size:18px}
+    .modal-body{display:grid; grid-template-columns:repeat(2,1fr); gap:10px}
+    .modal-footer{display:flex; gap:10px; justify-content:flex-end; margin-top:12px}
+    @media (max-width:720px){ .modal-body{grid-template-columns:1fr} }
+
+    /* Autocomplete */
+    .autocomplete{
+      position:relative; flex:1;
+    }
+    .suggestions{
+      position:absolute; top:100%; left:0; right:0; background:#0a1429; border:1px solid var(--border);
+      border-radius:10px; max-height:220px; overflow:auto; z-index:20; display:none;
+    }
+    .suggestion{
+      padding:8px 10px; cursor:pointer; border-bottom:1px solid var(--border);
+    }
+    .suggestion:hover{background:#0b162f}
+    .suggestion .name{font-weight:600}
+    .suggestion .meta{font-size:12px; color:var(--muted)}
+
+    /* Receipt print styles */
+    @media print{
+      body{background:#fff; color:#000}
+      header, nav, .no-print{display:none !important}
+      .receipt{box-shadow:none; border:none}
+      .receipt .card{background:#fff; color:#000; border:none}
+      .receipt table thead th{background:#eee; color:#000; border-color:#ddd}
+      .receipt table tbody td{background:#fff; color:#000; border-color:#eee}
+    }
+
+    /* Sections */
+    .section{margin-top:20px}
+    .section h2{font-size:18px; margin:0 0 10px 0; color:#cfe9ff}
+    .flex-between{display:flex; justify-content:space-between; align-items:center}
+    .note{font-size:12px; color:var(--muted)}
+    .divider{height:1px; background:var(--border); margin:10px 0}
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <div class="title"> Auto Bike Spare Parts</div>
+        <div class="subtitle">Inventory & Billing Management</div>
+      </div>
+    </div>
+    <nav class="no-print">
+      <button class="tab active" data-tab="dashboard">Dashboard</button>
+      <button class="tab" data-tab="inventory">Inventory</button>
+      <button class="tab" data-tab="billing">Billing</button>
+      <button class="tab" data-tab="reports">Reports</button>
+      <button class="tab" data-tab="settings">Settings</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <!-- Dashboard -->
+    <section id="dashboard" class="section">
+      <h2>Dashboard overview</h2>
+      <div class="grid-4">
+        <div class="card">
+          <h3>Total stock (units)</h3>
+          <div class="metric" id="dashTotalStock">0</div>
+          <div class="note">Sum of quantities across all items.</div>
+        </div>
+        <div class="card">
+          <h3>Low-stock alerts</h3>
+          <div class="metric warn" id="dashLowStockCount">0</div>
+          <div class="note">Items below their minimum level.</div>
+        </div>
+        <div class="card">
+          <h3>Total sales (PKR)</h3>
+          <div class="metric highlight" id="dashTotalSales">0</div>
+          <div class="note">Grand total of confirmed bills.</div>
+        </div>
+        <div class="card">
+          <h3>Total items</h3>
+          <div class="metric" id="dashTotalItems">0</div>
+          <div class="note">Distinct inventory products.</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="card">
+          <div class="flex-between">
+            <h3>Recent bills</h3>
+            <button class="btn secondary" id="refreshDashboard">Refresh</button>
+          </div>
+          <div class="divider"></div>
+          <table>
+            <thead>
+              <tr>
+                <th>Bill #</th>
+                <th>Date</th>
+                <th>Items</th>
+                <th>Subtotal</th>
+                <th>Discount</th>
+                <th>Tax</th>
+                <th>Grand total</th>
+              </tr>
+            </thead>
+            <tbody id="dashBillsBody">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Inventory -->
+    <section id="inventory" class="section" style="display:none">
+      <div class="flex-between">
+        <h2>Inventory management</h2>
+        <div class="toolbar no-print">
+          <button class="btn primary" id="addItemBtn">Add item</button>
+          <button class="btn secondary" id="exportCsvBtn">Export CSV</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <input type="text" id="invSearch" placeholder="Search items by name..." />
+          <select id="invCategoryFilter">
+            <option value="">All categories</option>
+            <option value="wholesale">Wholesale item</option>
+            <option value="retail">Retail item</option>
+          </select>
+          <select id="invPriceTypeFilter">
+            <option value="">All price types</option>
+            <option value="buyPrice">Buy price</option>
+            <option value="mechanicPrice">Mechanic price</option>
+            <option value="customerPrice">Customer price</option>
+          </select>
+          <label class="note" style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" id="showBuyPrice" />
+            Show buy price
+          </label>
+        </div>
+        <div class="divider"></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Category</th>
+              <th class="col-buy">Buy price</th>
+              <th>Mechanic</th>
+              <th>Customer</th>
+              <th>Stock</th>
+              <th>Min level</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="invTableBody">
+            <!-- Populated dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Billing -->
+    <section id="billing" class="section" style="display:none">
+      <div class="flex-between">
+        <h2>Billing</h2>
+        <div class="toolbar no-print">
+          <button class="btn success" id="confirmBillBtn">Confirm bill</button>
+          <button class="btn secondary" id="printBillBtn">Print receipt</button>
+          <button class="btn warn" id="clearBillBtn">Clear</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <div class="autocomplete">
+            <input type="text" id="billItemSearch" placeholder="Type to search items (e.g., 'a' lists items starting with 'a')..." />
+            <div class="suggestions" id="billItemSuggestions"></div>
+          </div>
+          <select id="billPriceMode">
+            <option value="customerPrice">Customer price</option>
+            <option value="mechanicPrice">Mechanic price</option>
+            <option value="buyPrice">Buy price (hidden)</option>
+          </select>
+          <label class="note" style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" id="billShowBuyPrice" />
+            Show buy price
+          </label>
+          <button class="btn primary" id="addSelectedItemBtn">Add selected</button>
+        </div>
+        <div class="divider"></div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Category</th>
+              <th>Unit price</th>
+              <th>Qty</th>
+              <th>Line total</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="billItemsBody">
+            <!-- Bill lines populated dynamically -->
+          </tbody>
+        </table>
+
+        <div class="divider"></div>
+        <div class="grid-4">
+          <div class="card">
+            <h3>Totals</h3>
+            <div class="metric small">Subtotal: <span id="billSubtotal">0</span></div>
+            <div class="metric small">Discount: <span id="billDiscountAmount">0</span></div>
+            <div class="metric small">Tax: <span id="billTaxAmount">0</span></div>
+            <div class="metric">Grand total: <span id="billGrandTotal">0</span></div>
+          </div>
+          <div class="card">
+            <h3>Discount</h3>
+            <div class="toolbar">
+              <select id="discountType">
+                <option value="none">None</option>
+                <option value="percent">Percent (%)</option>
+                <option value="flat">Flat (PKR)</option>
+              </select>
+              <input type="number" id="discountValue" placeholder="Value" min="0" />
+            </div>
+            <div class="note">Apply optional discount to subtotal.</div>
+          </div>
+          <div class="card">
+            <h3>Tax</h3>
+            <div class="toolbar">
+              <select id="taxType">
+                <option value="none">None</option>
+                <option value="percent">Percent (%)</option>
+                <option value="flat">Flat (PKR)</option>
+              </select>
+              <input type="number" id="taxValue" placeholder="Value" min="0" />
+            </div>
+            <div class="note">Apply optional tax after discount.</div>
+          </div>
+          <div class="card">
+            <h3>Bill meta</h3>
+            <div class="toolbar">
+              <input type="text" id="billCustomerName" placeholder="Customer name (optional)" />
+              <input type="text" id="billNotes" placeholder="Notes (optional)" />
+            </div>
+            <div class="note">Bill number is auto-generated.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Printable Receipt Area (Hidden in normal view) -->
+      <section class="receipt section" style="display:none">
+        <div class="card">
+          <h2>Receipt</h2>
+          <div id="receiptHeader" class="note"></div>
+          <div class="divider"></div>
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Category</th>
+                <th>Unit price</th>
+                <th>Qty</th>
+                <th>Line total</th>
+              </tr>
+            </thead>
+            <tbody id="receiptBody"></tbody>
+          </table>
+          <div class="divider"></div>
+          <div id="receiptTotals"></div>
+        </div>
+      </section>
+    </section>
+
+    <!-- Reports -->
+    <section id="reports" class="section" style="display:none">
+      <h2>Sales records</h2>
+      <div class="grid-4">
+        <div class="card">
+          <h3>Today sales</h3>
+          <div class="metric highlight" id="salesToday">0</div>
+          <div class="note">PKR total of bills created today.</div>
+        </div>
+        <div class="card">
+          <h3>This month sales</h3>
+          <div class="metric highlight" id="salesMonth">0</div>
+          <div class="note">PKR total of bills created this month.</div>
+        </div>
+        <div class="card">
+          <h3>Total bills</h3>
+          <div class="metric" id="salesBillsCount">0</div>
+          <div class="note">Count of stored bills.</div>
+        </div>
+        <div class="card">
+          <h3>Average bill</h3>
+          <div class="metric" id="salesAverage">0</div>
+          <div class="note">Grand total average per bill.</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="card">
+          <div class="flex-between">
+            <h3>Bill history</h3>
+            <div class="toolbar">
+              <input type="date" id="reportStartDate" />
+              <input type="date" id="reportEndDate" />
+              <button class="btn secondary" id="filterReportsBtn">Filter</button>
+              <button class="btn secondary" id="resetReportsBtn">Reset</button>
+            </div>
+          </div>
+          <div class="divider"></div>
+          <table>
+            <thead>
+              <tr>
+                <th>Bill #</th>
+                <th>Date</th>
+                <th>Customer</th>
+                <th>Items</th>
+                <th>Grand total</th>
+              </tr>
+            </thead>
+            <tbody id="reportsBody">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Settings -->
+    <section id="settings" class="section" style="display:none">
+      <h2>Settings & data</h2>
+      <div class="card">
+        <h3>Data storage</h3>
+        <ul>
+          <li><span class="muted">Inventory, bills, transactions are stored in your browser via localStorage.</span></li>
+          <li><span class="muted">This template works offline and does not use any backend.</span></li>
+        </ul>
+        <div class="divider"></div>
+        <div class="toolbar no-print">
+          <button class="btn warn" id="seedSampleBtn">Seed sample items</button>
+          <button class="btn danger" id="resetAllBtn">Reset all data</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Inventory Add/Edit Modal -->
+  <div class="modal-backdrop" id="itemModalBackdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="itemModalTitle">Add item</h3>
+        <button class="btn" id="closeItemModal">Close</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="itemId" />
+        <div>
+          <label>Item name</label>
+          <input type="text" id="itemName" placeholder="e.g., Brake pad 125cc" />
+        </div>
+        <div>
+          <label>Category</label>
+          <select id="itemCategory">
+            <option value="wholesale">Wholesale item</option>
+            <option value="retail">Retail item</option>
+          </select>
+        </div>
+        <div>
+          <label>Buy price (hidden)</label>
+          <input type="number" id="itemBuyPrice" min="0" placeholder="PKR" />
+        </div>
+        <div>
+          <label>Mechanic price</label>
+          <input type="number" id="itemMechanicPrice" min="0" placeholder="PKR" />
+        </div>
+        <div>
+          <label>Customer price</label>
+          <input type="number" id="itemCustomerPrice" min="0" placeholder="PKR" />
+        </div>
+        <div>
+          <label>Quantity in stock</label>
+          <input type="number" id="itemStock" min="0" placeholder="Units" />
+        </div>
+        <div>
+          <label>Minimum stock alert</label>
+          <input type="number" id="itemMinLevel" min="0" placeholder="Units" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn success" id="saveItemBtn">Save</button>
+        <button class="btn secondary" id="saveItemAddMoreBtn">Save & add more</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================
+    // LocalStorage keys
+    // =========================
+    const LS_KEYS = {
+      INVENTORY: 'shan_inventory',
+      BILLS: 'shan_bills',
+      TRANSACTIONS: 'shan_transactions' // reserved for future detail tracking
+    };
+
+    // =========================
+    // App State
+    // =========================
+    let inventory = [];
+    let bills = [];
+    let currentBill = { id: null, items: [], priceMode: 'customerPrice', discount: {type:'none', value:0}, tax: {type:'none', value:0}, meta:{customerName:'', notes:''} };
+
+    // =========================
+    // Utils
+    // =========================
+    const fmt = (n) => (Number(n||0)).toLocaleString('en-PK');
+    const todayStr = () => {
+      const d = new Date();
+      const pad = (x) => String(x).padStart(2,'0');
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    };
+    const withinDateRange = (dateISO, startISO, endISO) => {
+      if(!dateISO) return false;
+      const d = new Date(dateISO);
+      const s = startISO ? new Date(startISO) : null;
+      const e = endISO ? new Date(endISO) : null;
+      if(s && d < s) return false;
+      if(e && d > e) return false;
+      return true;
+    };
+    const uid = () => Math.random().toString(36).slice(2,9);
+
+    // =========================
+    // Storage
+    // =========================
+    function loadData(){
+      try {
+        inventory = JSON.parse(localStorage.getItem(LS_KEYS.INVENTORY) || '[]');
+        bills = JSON.parse(localStorage.getItem(LS_KEYS.BILLS) || '[]');
+      } catch(e){
+        inventory = [];
+        bills = [];
+      }
+    }
+    function saveInventory(){
+      localStorage.setItem(LS_KEYS.INVENTORY, JSON.stringify(inventory));
+    }
+    function saveBills(){
+      localStorage.setItem(LS_KEYS.BILLS, JSON.stringify(bills));
+    }
+    function resetAll(){
+      localStorage.removeItem(LS_KEYS.INVENTORY);
+      localStorage.removeItem(LS_KEYS.BILLS);
+      localStorage.removeItem(LS_KEYS.TRANSACTIONS);
+      inventory = [];
+      bills = [];
+      currentBill = { id: null, items: [], priceMode: 'customerPrice', discount: {type:'none', value:0}, tax: {type:'none', value:0}, meta:{customerName:'', notes:''} };
+      renderAll();
+      alert('All data has been reset.');
+    }
+
+    // =========================
+    // Seed Sample Items
+    // =========================
+    function seedSample(){
+      const sample = [
+        { id: uid(), name:'Brake pad 125cc', category:'retail', buyPrice:350, mechanicPrice:450, customerPrice:500, stock:30, minLevel:5 },
+        { id: uid(), name:'Engine oil 20W-50 1L', category:'wholesale', buyPrice:950, mechanicPrice:1050, customerPrice:1150, stock:80, minLevel:15 },
+        { id: uid(), name:'Spark plug NGK', category:'retail', buyPrice:250, mechanicPrice:300, customerPrice:350, stock:50, minLevel:10 },
+        { id: uid(), name:'Chain kit 70cc', category:'wholesale', buyPrice:1800, mechanicPrice:1950, customerPrice:2100, stock:20, minLevel:4 },
+        { id: uid(), name:'Air filter 125cc', category:'retail', buyPrice:200, mechanicPrice:260, customerPrice:300, stock:40, minLevel:8 },
+        { id: uid(), name:'Clutch plate set', category:'wholesale', buyPrice:1200, mechanicPrice:1350, customerPrice:1500, stock:15, minLevel:5 }
+      ];
+      inventory = sample;
+      saveInventory();
+      renderAll();
+      alert('Sample items seeded.');
+    }
+
+    // =========================
+    // Tabs
+    // =========================
+    const tabs = document.querySelectorAll('.tab');
+    tabs.forEach(t => t.addEventListener('click', () => {
+      tabs.forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      const id = t.dataset.tab;
+      ['dashboard','inventory','billing','reports','settings'].forEach(sec => {
+        document.getElementById(sec).style.display = (sec === id) ? '' : 'none';
+      });
+      // on entering a tab, refresh its data
+      renderAll();
+    }));
+
+    // =========================
+    // Dashboard Rendering
+    // =========================
+    function renderDashboard(){
+      // metrics
+      const totalStock = inventory.reduce((sum, it) => sum + Number(it.stock || 0), 0);
+      const lowStockCount = inventory.filter(it => Number(it.stock||0) < Number(it.minLevel||0)).length;
+      const totalSales = bills.reduce((sum, b) => sum + Number(b.totals?.grand || 0), 0);
+
+      document.getElementById('dashTotalStock').textContent = fmt(totalStock);
+      document.getElementById('dashLowStockCount').textContent = fmt(lowStockCount);
+      document.getElementById('dashTotalSales').textContent = fmt(totalSales);
+      document.getElementById('dashTotalItems').textContent = fmt(inventory.length);
+
+      // recent bills
+      const tbody = document.getElementById('dashBillsBody');
+      tbody.innerHTML = '';
+      const recent = [...bills].sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0,8);
+      recent.forEach(b => {
+        const tr = document.createElement('tr');
+        const itemsCount = (b.items||[]).reduce((sum, it) => sum + Number(it.qty||0), 0);
+        tr.innerHTML = `
+          <td>${b.id}</td>
+          <td>${new Date(b.date).toLocaleString()}</td>
+          <td>${itemsCount}</td>
+          <td>${fmt(b.totals?.subtotal||0)}</td>
+          <td>${fmt(b.totals?.discount||0)}</td>
+          <td>${fmt(b.totals?.tax||0)}</td>
+          <td class="highlight">${fmt(b.totals?.grand||0)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // =========================
+    // Inventory Rendering & Filters
+    // =========================
+    function renderInventory(){
+      const showBuy = document.getElementById('showBuyPrice').checked;
+      // toggle column visibility
+      document.querySelectorAll('.col-buy, th.col-buy').forEach(el => {
+        el.style.display = showBuy ? '' : 'none';
+      });
+
+      const search = document.getElementById('invSearch').value.trim().toLowerCase();
+      const cat = document.getElementById('invCategoryFilter').value;
+      const priceType = document.getElementById('invPriceTypeFilter').value;
+
+      let list = [...inventory];
+      if(search){
+        list = list.filter(it => it.name.toLowerCase().includes(search));
+      }
+      if(cat){
+        list = list.filter(it => it.category === cat);
+      }
+      if(priceType){
+        list = list.filter(it => Number(it[priceType] || 0) > 0);
+      }
+
+      const tbody = document.getElementById('invTableBody');
+      tbody.innerHTML = '';
+
+      list.forEach(it => {
+        const low = Number(it.stock||0) < Number(it.minLevel||0);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>
+            <div>${it.name}</div>
+            ${low ? '<div class="tag low" title="Below minimum level">Low stock</div>' : ''}
+          </td>
+          <td>
+            <span class="tag ${it.category==='wholesale'?'wholesale':'retail'}">
+              ${it.category==='wholesale'?'Wholesale':'Retail'}
+            </span>
+          </td>
+          <td class="col-buy" style="display:${showBuy?'table-cell':'none'}">${fmt(it.buyPrice||0)}</td>
+          <td>${fmt(it.mechanicPrice||0)}</td>
+          <td>${fmt(it.customerPrice||0)}</td>
+          <td>${fmt(it.stock||0)}</td>
+          <td>${fmt(it.minLevel||0)}</td>
+          <td>
+            <button class="btn" onclick="onEditItem('${it.id}')">Edit</button>
+            <button class="btn danger" onclick="onDeleteItem('${it.id}')">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // =========================
+    // Inventory CRUD
+    // =========================
+    const itemModalBackdrop = document.getElementById('itemModalBackdrop');
+    const addItemBtn = document.getElementById('addItemBtn');
+    const closeItemModal = document.getElementById('closeItemModal');
+    const saveItemBtn = document.getElementById('saveItemBtn');
+    const saveItemAddMoreBtn = document.getElementById('saveItemAddMoreBtn');
+
+    addItemBtn.addEventListener('click', () => openItemModal());
+    closeItemModal.addEventListener('click', () => itemModalBackdrop.style.display = 'none');
+
+    function openItemModal(item=null){
+      itemModalBackdrop.style.display = 'flex';
+      document.getElementById('itemModalTitle').textContent = item ? 'Edit item' : 'Add item';
+      document.getElementById('itemId').value = item?.id || '';
+      document.getElementById('itemName').value = item?.name || '';
+      document.getElementById('itemCategory').value = item?.category || 'retail';
+      document.getElementById('itemBuyPrice').value = item?.buyPrice ?? '';
+      document.getElementById('itemMechanicPrice').value = item?.mechanicPrice ?? '';
+      document.getElementById('itemCustomerPrice').value = item?.customerPrice ?? '';
+      document.getElementById('itemStock').value = item?.stock ?? '';
+      document.getElementById('itemMinLevel').value = item?.minLevel ?? '';
+    }
+
+    function onEditItem(id){
+      const item = inventory.find(x => x.id === id);
+      if(item) openItemModal(item);
+    }
+
+    function onDeleteItem(id){
+      if(!confirm('Delete this item?')) return;
+      inventory = inventory.filter(x => x.id !== id);
+      saveInventory();
+      renderAll();
+    }
+
+    function collectItemForm(){
+      const id = document.getElementById('itemId').value || uid();
+      const name = document.getElementById('itemName').value.trim();
+      const category = document.getElementById('itemCategory').value;
+      const buyPrice = Number(document.getElementById('itemBuyPrice').value || 0);
+      const mechanicPrice = Number(document.getElementById('itemMechanicPrice').value || 0);
+      const customerPrice = Number(document.getElementById('itemCustomerPrice').value || 0);
+      const stock = Number(document.getElementById('itemStock').value || 0);
+      const minLevel = Number(document.getElementById('itemMinLevel').value || 0);
+      if(!name){
+        alert('Item name is required.');
+        return null;
+      }
+      return { id, name, category, buyPrice, mechanicPrice, customerPrice, stock, minLevel };
+    }
+
+    function saveItem(closeAfter=true){
+      const item = collectItemForm();
+      if(!item) return;
+      const idx = inventory.findIndex(x => x.id === item.id);
+      if(idx >= 0) inventory[idx] = item;
+      else inventory.push(item);
+      saveInventory();
+      renderAll();
+      if(closeAfter){
+        itemModalBackdrop.style.display = 'none';
+      } else {
+        // clear form for adding more
+        document.getElementById('itemId').value = '';
+        document.getElementById('itemName').value = '';
+        document.getElementById('itemCategory').value = 'retail';
+        document.getElementById('itemBuyPrice').value = '';
+        document.getElementById('itemMechanicPrice').value = '';
+        document.getElementById('itemCustomerPrice').value = '';
+        document.getElementById('itemStock').value = '';
+        document.getElementById('itemMinLevel').value = '';
+      }
+    }
+    saveItemBtn.addEventListener('click', () => saveItem(true));
+    saveItemAddMoreBtn.addEventListener('click', () => saveItem(false));
+
+    // Inventory filters
+    document.getElementById('invSearch').addEventListener('input', renderInventory);
+    document.getElementById('invCategoryFilter').addEventListener('change', renderInventory);
+    document.getElementById('invPriceTypeFilter').addEventListener('change', renderInventory);
+    document.getElementById('showBuyPrice').addEventListener('change', renderInventory);
+
+    // Export CSV
+    document.getElementById('exportCsvBtn').addEventListener('click', () => {
+      const headers = ['id','name','category','buyPrice','mechanicPrice','customerPrice','stock','minLevel'];
+      const rows = inventory.map(it => headers.map(h => String(it[h] ?? '')).join(','));
+      const csv = [headers.join(','), ...rows].join('\n');
+      const blob = new Blob([csv], {type:'text/csv'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'inventory.csv';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    // =========================
+    // Billing
+    // =========================
+    const billItemSearch = document.getElementById('billItemSearch');
+    const billItemSuggestions = document.getElementById('billItemSuggestions');
+    const billPriceModeSel = document.getElementById('billPriceMode');
+    const billShowBuyPrice = document.getElementById('billShowBuyPrice');
+    const addSelectedItemBtn = document.getElementById('addSelectedItemBtn');
+
+    billPriceModeSel.addEventListener('change', () => {
+      currentBill.priceMode = billPriceModeSel.value;
+      renderBill();
+    });
+    billShowBuyPrice.addEventListener('change', () => {
+      renderBill(); // toggles visibility in table via building HTML
+    });
+
+    // Autocomplete: show items starting with input (case-insensitive)
+    billItemSearch.addEventListener('input', () => {
+      const q = billItemSearch.value.trim().toLowerCase();
+      if(!q){
+        billItemSuggestions.style.display = 'none';
+        billItemSuggestions.innerHTML = '';
+        return;
+      }
+      const suggestions = inventory
+        .filter(it => it.name.toLowerCase().startsWith(q))
+        .slice(0, 20);
+      if(suggestions.length === 0){
+        billItemSuggestions.style.display = 'none';
+        billItemSuggestions.innerHTML = '';
+        return;
+      }
+      billItemSuggestions.innerHTML = '';
+      suggestions.forEach(it => {
+        const div = document.createElement('div');
+        div.className = 'suggestion';
+        div.innerHTML = `
+          <div class="name">${it.name}</div>
+          <div class="meta">Stock: ${fmt(it.stock)} | ${it.category==='wholesale'?'Wholesale':'Retail'} | Price (cust): ${fmt(it.customerPrice)}</div>
+        `;
+        div.addEventListener('click', () => {
+          billItemSearch.value = it.name;
+          billItemSearch.dataset.selectedId = it.id;
+          billItemSuggestions.style.display = 'none';
+        });
+        billItemSuggestions.appendChild(div);
+      });
+      billItemSuggestions.style.display = 'block';
+    });
+
+    // Add selected item from search
+    addSelectedItemBtn.addEventListener('click', () => {
+      const id = billItemSearch.dataset.selectedId;
+      const item = inventory.find(x => x.id === id) || inventory.find(x => x.name.toLowerCase() === billItemSearch.value.trim().toLowerCase());
+      if(!item){
+        alert('Please select a valid item from suggestions.');
+        return;
+      }
+      addItemToBill(item.id, 1);
+      billItemSearch.value = '';
+      billItemSearch.dataset.selectedId = '';
+      renderBill();
+    });
+
+    function addItemToBill(itemId, qty=1){
+      const item = inventory.find(x => x.id === itemId);
+      if(!item) return;
+      const existing = currentBill.items.find(x => x.itemId === itemId);
+      if(existing){
+        existing.qty += qty;
+      } else {
+        currentBill.items.push({ itemId, qty });
+      }
+    }
+
+    function removeItemFromBill(itemId){
+      currentBill.items = currentBill.items.filter(x => x.itemId !== itemId);
+      renderBill();
+    }
+
+    function updateBillQty(itemId, qty){
+      const it = currentBill.items.find(x => x.itemId === itemId);
+      if(!it) return;
+      it.qty = Math.max(1, Number(qty||1));
+      renderBill();
+    }
+
+    function unitPrice(item, mode){
+      if(mode === 'buyPrice') return Number(item.buyPrice||0);
+      if(mode === 'mechanicPrice') return Number(item.mechanicPrice||0);
+      return Number(item.customerPrice||0);
+    }
+
+    function computeTotals(){
+      const mode = currentBill.priceMode;
+      let subtotal = 0;
+      currentBill.items.forEach(line => {
+        const item = inventory.find(x => x.id === line.itemId);
+        const up = unitPrice(item, mode);
+        subtotal += up * Number(line.qty||0);
+      });
+      // discount
+      let discount = 0;
+      const d = currentBill.discount;
+      if(d.type === 'percent'){
+        discount = subtotal * (Number(d.value||0)/100);
+      } else if(d.type === 'flat'){
+        discount = Math.min(Number(d.value||0), subtotal);
+      }
+      const afterDiscount = subtotal - discount;
+      // tax
+      let tax = 0;
+      const t = currentBill.tax;
+      if(t.type === 'percent'){
+        tax = afterDiscount * (Number(t.value||0)/100);
+      } else if(t.type === 'flat'){
+        tax = Number(t.value||0);
+      }
+      const grand = Math.max(0, afterDiscount + tax);
+      return { subtotal, discount, tax, grand };
+    }
+
+    function renderBill(){
+      const tbody = document.getElementById('billItemsBody');
+      tbody.innerHTML = '';
+      const mode = currentBill.priceMode;
+      const showBuy = billShowBuyPrice.checked;
+
+      currentBill.items.forEach(line => {
+        const item = inventory.find(x => x.id === line.itemId);
+        if(!item) return;
+        const up = unitPrice(item, mode);
+        const total = up * Number(line.qty||0);
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${item.name}</td>
+          <td><span class="tag ${item.category==='wholesale'?'wholesale':'retail'}">${item.category==='wholesale'?'Wholesale':'Retail'}</span></td>
+          <td>
+            ${showBuy ? `<div class="note">Buy: ${fmt(item.buyPrice||0)}</div>` : ''}
+            <div>${mode==='mechanicPrice'?'Mechanic':mode==='buyPrice'?'Buy':'Customer'}: ${fmt(up)}</div>
+          </td>
+          <td>
+            <input type="number" min="1" value="${line.qty}" style="width:90px" onchange="updateBillQty('${item.id}', this.value)" />
+          </td>
+          <td>${fmt(total)}</td>
+          <td><button class="btn danger" onclick="removeItemFromBill('${item.id}')">Remove</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // totals
+      const totals = computeTotals();
+      document.getElementById('billSubtotal').textContent = fmt(totals.subtotal);
+      document.getElementById('billDiscountAmount').textContent = fmt(totals.discount);
+      document.getElementById('billTaxAmount').textContent = fmt(totals.tax);
+      document.getElementById('billGrandTotal').textContent = fmt(totals.grand);
+    }
+
+    // Discount/Tax inputs
+    const discountType = document.getElementById('discountType');
+    const discountValue = document.getElementById('discountValue');
+    const taxType = document.getElementById('taxType');
+    const taxValue = document.getElementById('taxValue');
+    discountType.addEventListener('change', () => {
+      currentBill.discount.type = discountType.value;
+      renderBill();
+    });
+    discountValue.addEventListener('input', () => {
+      currentBill.discount.value = Number(discountValue.value||0);
+      renderBill();
+    });
+    taxType.addEventListener('change', () => {
+      currentBill.tax.type = taxType.value;
+      renderBill();
+    });
+    taxValue.addEventListener('input', () => {
+      currentBill.tax.value = Number(taxValue.value||0);
+      renderBill();
+    });
+    document.getElementById('billCustomerName').addEventListener('input', e => currentBill.meta.customerName = e.target.value);
+    document.getElementById('billNotes').addEventListener('input', e => currentBill.meta.notes = e.target.value);
+
+    // Confirm bill: reduces stock, stores bill
+    document.getElementById('confirmBillBtn').addEventListener('click', () => {
+      if(currentBill.items.length === 0){
+        alert('Add items to the bill first.');
+        return;
+      }
+      // validate stock
+      for(const line of currentBill.items){
+        const item = inventory.find(x => x.id === line.itemId);
+        if(!item) continue;
+        if(Number(item.stock||0) < Number(line.qty||0)){
+          alert(`Insufficient stock for "${item.name}". Available: ${fmt(item.stock)}, requested: ${fmt(line.qty)}.`);
+          return;
+        }
+      }
+
+      // reduce stock
+      currentBill.items.forEach(line => {
+        const item = inventory.find(x => x.id === line.itemId);
+        if(item) item.stock = Number(item.stock||0) - Number(line.qty||0);
+      });
+      saveInventory();
+
+      // store bill
+      const totals = computeTotals();
+      const bill = {
+        id: 'B-' + Date.now().toString().slice(-8),
+        date: new Date().toISOString(),
+        items: currentBill.items.map(x => ({...x})),
+        priceMode: currentBill.priceMode,
+        totals,
+        meta: { ...currentBill.meta }
+      };
+      bills.push(bill);
+      saveBills();
+
+      // low stock notify (simple alert)
+      const lows = inventory.filter(it => Number(it.stock||0) < Number(it.minLevel||0));
+      if(lows.length > 0){
+        console.warn('Low stock items:', lows.map(l => l.name).join(', '));
+      }
+
+      // clear current bill
+      currentBill = { id: null, items: [], priceMode: billPriceModeSel.value, discount: {type:'none', value:0}, tax: {type:'none', value:0}, meta:{customerName:'', notes:''} };
+      // clear inputs
+      discountType.value = 'none'; discountValue.value = '';
+      taxType.value = 'none'; taxValue.value = '';
+      document.getElementById('billCustomerName').value = '';
+      document.getElementById('billNotes').value = '';
+
+      renderAll();
+      alert(`Bill ${bill.id} confirmed. Inventory updated.`);
+      // show receipt preview automatically
+      buildReceipt(bill);
+      document.querySelector('.receipt.section').style.display = '';
+    });
+
+    // Clear bill
+    document.getElementById('clearBillBtn').addEventListener('click', () => {
+      if(!confirm('Clear current bill?')) return;
+      currentBill = { id: null, items: [], priceMode: billPriceModeSel.value, discount: {type:'none', value:0}, tax: {type:'none', value:0}, meta:{customerName:'', notes:''} };
+      discountType.value = 'none'; discountValue.value = '';
+      taxType.value = 'none'; taxValue.value = '';
+      document.getElementById('billCustomerName').value = '';
+      document.getElementById('billNotes').value = '';
+      renderBill();
+    });
+
+    // Print receipt for latest or current selection
+    document.getElementById('printBillBtn').addEventListener('click', () => {
+      const area = document.querySelector('.receipt.section');
+      if(area.style.display === 'none'){
+        // if no receipt built yet, try building from last bill
+        if(bills.length === 0){
+          alert('No confirmed bills to print.');
+          return;
+        }
+        buildReceipt(bills[bills.length-1]);
+        area.style.display = '';
+      }
+      window.print();
+    });
+
+    function buildReceipt(bill){
+      const head = document.getElementById('receiptHeader');
+      head.innerHTML = `
+        <div><strong>Bill #:</strong> ${bill.id}</div>
+        <div><strong>Date:</strong> ${new Date(bill.date).toLocaleString()}</div>
+        ${bill.meta.customerName ? `<div><strong>Customer:</strong> ${bill.meta.customerName}</div>` : ''}
+        ${bill.meta.notes ? `<div><strong>Notes:</strong> ${bill.meta.notes}</div>` : ''}
+      `;
+      const tbody = document.getElementById('receiptBody');
+      tbody.innerHTML = '';
+      bill.items.forEach(line => {
+        const item = inventory.find(x => x.id === line.itemId) || {name:'(deleted)', category:'retail'};
+        const up = unitPrice(item, bill.priceMode);
+        const total = up * Number(line.qty||0);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${item.name}</td>
+          <td>${item.category==='wholesale'?'Wholesale':'Retail'}</td>
+          <td>${fmt(up)}</td>
+          <td>${fmt(line.qty)}</td>
+          <td>${fmt(total)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+      const totals = bill.totals;
+      const totDiv = document.getElementById('receiptTotals');
+      totDiv.innerHTML = `
+        <div>Subtotal: <strong>${fmt(totals.subtotal)}</strong></div>
+        <div>Discount: <strong>${fmt(totals.discount)}</strong></div>
+        <div>Tax: <strong>${fmt(totals.tax)}</strong></div>
+        <div>Grand total: <strong>${fmt(totals.grand)}</strong></div>
+      `;
+    }
+
+    // =========================
+    // Reports
+    // =========================
+    function renderReports(){
+      const now = new Date();
+      const todayISO = todayStr();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+      const todayTotal = bills
+        .filter(b => new Date(b.date).toISOString().slice(0,10) === todayISO)
+        .reduce((sum, b) => sum + Number(b.totals?.grand||0), 0);
+
+      const monthTotal = bills
+        .filter(b => new Date(b.date) >= new Date(monthStart))
+        .reduce((sum, b) => sum + Number(b.totals?.grand||0), 0);
+
+      const count = bills.length;
+      const avg = count ? (bills.reduce((s, b) => s + Number(b.totals?.grand||0), 0) / count) : 0;
+
+      document.getElementById('salesToday').textContent = fmt(todayTotal);
+      document.getElementById('salesMonth').textContent = fmt(monthTotal);
+      document.getElementById('salesBillsCount').textContent = fmt(count);
+      document.getElementById('salesAverage').textContent = fmt(avg);
+
+      // history table
+      const start = document.getElementById('reportStartDate').value || null;
+      const end = document.getElementById('reportEndDate').value || null;
+      const tbody = document.getElementById('reportsBody');
+      tbody.innerHTML = '';
+      bills
+        .filter(b => withinDateRange(b.date, start, end))
+        .sort((a,b) => new Date(b.date) - new Date(a.date))
+        .forEach(b => {
+          const tr = document.createElement('tr');
+          const itemsCount = (b.items||[]).reduce((sum, it) => sum + Number(it.qty||0), 0);
+          tr.innerHTML = `
+            <td>${b.id}</td>
+            <td>${new Date(b.date).toLocaleString()}</td>
+            <td>${b.meta.customerName || '-'}</td>
+            <td>${itemsCount}</td>
+            <td class="highlight">${fmt(b.totals?.grand||0)}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+    }
+
+    document.getElementById('filterReportsBtn').addEventListener('click', renderReports);
+    document.getElementById('resetReportsBtn').addEventListener('click', () => {
+      document.getElementById('reportStartDate').value = '';
+      document.getElementById('reportEndDate').value = '';
+      renderReports();
+    });
+
+    // =========================
+    // Settings actions
+    // =========================
+    document.getElementById('resetAllBtn').addEventListener('click', resetAll);
+    document.getElementById('seedSampleBtn').addEventListener('click', seedSample);
+
+    // =========================
+    // Dashboard refresh button
+    // =========================
+    document.getElementById('refreshDashboard').addEventListener('click', renderDashboard);
+
+    // =========================
+    // Initial load & render
+    // =========================
+    function renderAll(){
+      renderDashboard();
+      renderInventory();
+      renderBill();
+      renderReports();
+    }
+    loadData();
+    // If no data, seed a few items once
+    if(!inventory || inventory.length === 0){
+      seedSample();
+    } else {
+      renderAll();
+    }
+  </script>
+</body>
+</html>
